@@ -1,0 +1,1353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stack Mapper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* ============ TOKENS ============ */
+:root{
+  color-scheme: light;
+  --plane:#eef0f4;
+  --surface:#ffffff;
+  --surface-2:#f6f7f9;
+  --ink:#141821;
+  --ink-2:#525a66;
+  --muted:#8a929e;
+  --hair:#e2e5ea;
+  --hair-strong:#cfd4dc;
+  --accent:#c6791b;
+  --accent-ink:#8a5310;
+  --accent-wash:#f7ead6;
+  --danger:#c23b3b;
+  --shadow:0 1px 2px rgba(20,24,33,.06),0 8px 24px rgba(20,24,33,.08);
+  --shadow-sm:0 1px 2px rgba(20,24,33,.08);
+  /* layer hues (categorical, validated) */
+  --L0:#2a78d6; --L1:#eb6834; --L2:#1baf7a; --L3:#4a3aa7; --L4:#c98a00; --L5:#e87ba4;
+  --L0-wash:#e7f0fb; --L1-wash:#fce9e0; --L2-wash:#e0f4ed; --L3-wash:#eae7f6; --L4-wash:#f7eecf; --L5-wash:#fbe9f0;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --plane:#0b0e13;
+    --surface:#151a21;
+    --surface-2:#1b212a;
+    --ink:#eef1f6;
+    --ink-2:#a7b0bd;
+    --muted:#6f7883;
+    --hair:#252c36;
+    --hair-strong:#333c48;
+    --accent:#f0b53f;
+    --accent-ink:#f7cd77;
+    --accent-wash:#3a2f18;
+    --danger:#e06a6a;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.45);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+    --L0:#3987e5; --L1:#e56a3a; --L2:#199e70; --L3:#9085e9; --L4:#d6a12e; --L5:#d55181;
+    --L0-wash:#16273c; --L1-wash:#33201a; --L2-wash:#122b24; --L3-wash:#22203a; --L4-wash:#2f2712; --L5-wash:#331a26;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --plane:#0b0e13;
+  --surface:#151a21;
+  --surface-2:#1b212a;
+  --ink:#eef1f6;
+  --ink-2:#a7b0bd;
+  --muted:#6f7883;
+  --hair:#252c36;
+  --hair-strong:#333c48;
+  --accent:#f0b53f;
+  --accent-ink:#f7cd77;
+  --accent-wash:#3a2f18;
+  --danger:#e06a6a;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.45);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+  --L0:#3987e5; --L1:#e56a3a; --L2:#199e70; --L3:#9085e9; --L4:#d6a12e; --L5:#d55181;
+  --L0-wash:#16273c; --L1-wash:#33201a; --L2-wash:#122b24; --L3-wash:#22203a; --L4-wash:#2f2712; --L5-wash:#331a26;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--plane);color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;
+}
+.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+.eyebrow{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:500}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* ============ APP SHELL ============ */
+.app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.topbar{
+  display:flex;align-items:center;gap:16px;padding:0 16px;height:56px;
+  background:var(--surface);border-bottom:1px solid var(--hair);flex:none;z-index:20;
+}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand .glyph{width:26px;height:26px;flex:none}
+.brand h1{font-size:15px;font-weight:600;margin:0;letter-spacing:-.01em;white-space:nowrap}
+.brand .sub{font-size:11px;color:var(--muted);white-space:nowrap}
+.topbar .spacer{flex:1}
+
+/* segmented view switch */
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--hair);border-radius:9px;padding:3px}
+.seg button{
+  border:0;background:transparent;color:var(--ink-2);font-size:12.5px;font-weight:500;
+  padding:6px 14px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:7px;transition:.15s;
+}
+.seg button svg{width:15px;height:15px}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm);font-weight:600}
+
+.btn{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid var(--hair-strong);background:var(--surface);
+  color:var(--ink);font-size:12.5px;font-weight:500;padding:7px 12px;border-radius:8px;cursor:pointer;transition:.15s;white-space:nowrap;
+}
+.btn svg{width:15px;height:15px}
+.btn:hover{border-color:var(--muted);background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .btn.primary,:root:not([data-theme="light"]) .btn.primary{color:#1a1204}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .btn.primary{color:#fff}}
+.btn.primary:hover{filter:brightness(1.05)}
+.btn.icon{padding:7px;width:34px;height:34px;justify-content:center}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.ghost:hover{background:var(--surface-2)}
+.rail-toggle{display:none}
+
+/* ============ WORKSPACE ============ */
+.work{flex:1;display:flex;min-height:0;position:relative}
+.rail{
+  width:320px;flex:none;background:var(--surface);border-right:1px solid var(--hair);
+  display:flex;flex-direction:column;min-height:0;
+}
+.rail-head{padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between}
+.rail-head .eyebrow{display:block}
+.rail-head .count{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);background:var(--surface-2);border:1px solid var(--hair);padding:2px 7px;border-radius:20px}
+.rail-search{padding:0 16px 10px;position:relative}
+.rail-search svg{position:absolute;left:26px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--muted);pointer-events:none}
+.rail-search input{width:100%;padding:7px 10px 7px 30px;border:1px solid var(--hair-strong);border-radius:8px;background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:12.5px;transition:.15s}
+.rail-search input:focus{outline:none;border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent)}
+.rail-scroll{overflow-y:auto;flex:1;padding:0 10px 16px}
+
+/* inventory list grouped by layer */
+.layer-group{margin-bottom:14px}
+.layer-group .lg-head{display:flex;align-items:center;gap:8px;padding:6px 6px 5px}
+.dot{width:10px;height:10px;border-radius:3px;flex:none}
+.lg-head .name{font-size:11.5px;font-weight:600;letter-spacing:.02em;color:var(--ink-2)}
+.lg-head .n{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--muted)}
+
+.item{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;
+  border:1px solid transparent;transition:.12s;
+}
+.item:hover{background:var(--surface-2)}
+.item.sel{background:var(--accent-wash);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
+.item .bar{width:3px;align-self:stretch;border-radius:3px;flex:none}
+.item .body{min-width:0;flex:1}
+.item .nm{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .meta{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .lk{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--muted);flex:none}
+
+.empty{padding:28px 18px;text-align:center;color:var(--muted);font-size:12.5px}
+.empty svg{width:30px;height:30px;opacity:.5;margin-bottom:8px}
+
+.rail-foot{border-top:1px solid var(--hair);padding:10px;display:flex;gap:8px}
+.rail-foot .btn{flex:1;justify-content:center}
+
+/* ============ CANVAS ============ */
+.canvas{flex:1;position:relative;min-width:0;background:var(--plane);overflow:hidden}
+.legend{
+  position:absolute;top:12px;left:12px;z-index:5;background:color-mix(in srgb,var(--surface) 88%,transparent);
+  backdrop-filter:blur(6px);border:1px solid var(--hair);border-radius:10px;padding:9px 11px;box-shadow:var(--shadow-sm);
+  display:flex;flex-direction:column;gap:5px;max-width:190px;
+}
+.legend .eyebrow{margin-bottom:2px}
+.legend .row{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ink-2);cursor:pointer;user-select:none}
+.legend .row.off{opacity:.38}
+.legend .row .dot{width:11px;height:11px;border-radius:3px}
+
+.canvas-tools{position:absolute;top:12px;right:12px;z-index:5;display:flex;gap:6px}
+.canvas-tools[hidden]{display:none}
+.canvas-tools .btn{box-shadow:var(--shadow-sm)}
+
+/* ---- STACK VIEW ---- */
+.stack{position:absolute;inset:0;overflow:auto;padding:20px 22px 40px}
+.stack-inner{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.tier{
+  border:1px solid var(--hair);border-radius:12px;background:var(--surface);overflow:hidden;
+  box-shadow:var(--shadow-sm);
+}
+.tier-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--hair);background:var(--surface-2)}
+.tier-head .dot{width:12px;height:12px}
+.tier-head .t-name{font-weight:600;font-size:13px}
+.tier-head .t-desc{font-size:11.5px;color:var(--muted)}
+.tier-head .t-n{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted)}
+.tier-body{padding:12px 14px;display:flex;flex-wrap:wrap;gap:9px;min-height:20px}
+.tier-empty{color:var(--muted);font-size:12px;font-style:italic;padding:2px}
+.card{
+  display:flex;flex-direction:column;gap:2px;padding:9px 12px;border-radius:9px;cursor:pointer;
+  border:1px solid var(--hair-strong);background:var(--surface);min-width:120px;transition:.13s;position:relative;
+}
+.card:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
+.card::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--cardc)}
+.card .cn{font-size:13px;font-weight:600;padding-left:8px}
+.card .cv{font-size:11px;color:var(--muted);padding-left:8px}
+.card.dim{opacity:.28}
+.card.hot{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 35%,transparent)}
+.card.sel{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 45%,transparent)}
+
+/* ---- GRAPH VIEW ---- */
+.graph{position:absolute;inset:0}
+#gsvg{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#gsvg.panning{cursor:grabbing}
+.edge{stroke:var(--hair-strong);stroke-width:1.5;fill:none}
+.edge.hot{stroke:var(--accent);stroke-width:2.5}
+.edge.faded{opacity:.12}
+.edge-label{font-family:"IBM Plex Mono",monospace;font-size:9px;fill:var(--muted)}
+.node-hit{cursor:pointer}
+.node-circle{stroke:var(--surface);stroke-width:2.5}
+.node-circle.sel{stroke:var(--accent);stroke-width:3.5}
+.node-label{font-size:11.5px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:3.5px;stroke-linejoin:round}
+.node.faded{opacity:.2}
+.hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:4;font-size:11px;color:var(--muted);background:color-mix(in srgb,var(--surface) 80%,transparent);border:1px solid var(--hair);padding:5px 12px;border-radius:20px;backdrop-filter:blur(6px)}
+
+/* ---- 3D VIEW (orthographic "cheat" projection) ---- */
+.three{position:absolute;inset:0}
+#tsvg{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#tsvg.rotating{cursor:grabbing}
+.t-floor{stroke-width:1.5}
+.t-floor-label{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.04em;fill:var(--muted);text-anchor:middle}
+
+/* ============ DETAIL / FORM PANEL ============ */
+.panel{
+  position:absolute;top:0;right:0;bottom:0;width:340px;background:var(--surface);border-left:1px solid var(--hair);
+  box-shadow:var(--shadow);z-index:15;display:flex;flex-direction:column;transform:translateX(100%);
+  transition:transform .22s cubic-bezier(.4,0,.2,1);
+}
+.panel.open{transform:translateX(0)}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--hair)}
+.panel-head h2{font-size:14px;margin:0;font-weight:600}
+.panel-body{overflow-y:auto;flex:1;padding:16px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-2);margin-bottom:6px}
+.field input,.field select,.field textarea{
+  width:100%;padding:9px 11px;border:1px solid var(--hair-strong);border-radius:8px;background:var(--surface);
+  color:var(--ink);font-family:inherit;font-size:13px;transition:.15s;
+}
+.field textarea{resize:vertical;min-height:56px;line-height:1.5}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent)}
+.field .hintline{font-size:11px;color:var(--muted);margin-top:5px}
+
+.rel-list{display:flex;flex-direction:column;gap:6px}
+.rel{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--hair);border-radius:8px;background:var(--surface-2);font-size:12px}
+.rel .rt{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--accent-ink);background:var(--accent-wash);padding:1px 6px;border-radius:5px;white-space:nowrap}
+.rel .rn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.rel .dir{color:var(--muted);flex:none}
+.rel .x{cursor:pointer;color:var(--muted);flex:none;display:flex}
+.rel .x:hover{color:var(--danger)}
+
+.divider{height:1px;background:var(--hair);margin:18px 0}
+.sec-title{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-family:"IBM Plex Mono",monospace}
+
+.rel-builder{display:flex;flex-direction:column;gap:8px;background:var(--surface-2);border:1px solid var(--hair);border-radius:10px;padding:11px}
+.rel-builder select{width:100%}
+.panel-foot{padding:12px 16px;border-top:1px solid var(--hair);display:flex;gap:9px}
+.panel-foot .btn{flex:1;justify-content:center}
+.btn.danger{color:var(--danger);border-color:transparent;background:transparent}
+.btn.danger:hover{background:color-mix(in srgb,var(--danger) 12%,transparent)}
+
+/* backdrop for panel on small screens */
+.backdrop{position:fixed;inset:0;background:rgba(10,12,16,.35);z-index:14;opacity:0;pointer-events:none;transition:.2s}
+.backdrop.show{opacity:1;pointer-events:auto}
+
+/* toast */
+.toasts{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:40;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast{background:var(--ink);color:var(--surface);font-size:12.5px;padding:9px 15px;border-radius:9px;box-shadow:var(--shadow);animation:tin .25s;display:flex;align-items:center;gap:12px}
+.toast-action{background:transparent;border:1px solid currentColor;opacity:.8;color:inherit;font-family:inherit;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;flex:none}
+.toast-action:hover{opacity:1;background:rgba(255,255,255,.14)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* confirm modal */
+.confirm-overlay{position:fixed;inset:0;background:rgba(10,12,16,.45);z-index:50;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:.15s}
+.confirm-overlay.show{opacity:1;pointer-events:auto}
+.confirm-box{background:var(--surface);border:1px solid var(--hair);border-radius:12px;box-shadow:var(--shadow);padding:18px;width:min(340px,88vw)}
+.confirm-box h3{margin:0 0 8px;font-size:14px;font-weight:600}
+.confirm-box p{margin:0 0 16px;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.confirm-box .row{display:flex;gap:9px}
+.confirm-box .row .btn{flex:1;justify-content:center}
+.btn.danger-solid{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.danger-solid:hover{filter:brightness(1.08)}
+
+@media (max-width:760px){
+  .rail{position:absolute;z-index:16;height:100%;box-shadow:var(--shadow);transform:translateX(-100%);transition:transform .22s cubic-bezier(.4,0,.2,1)}
+  .rail.open{transform:translateX(0)}
+  .panel{width:min(340px,88vw)}
+  .brand .sub{display:none}
+  .rail-toggle{display:inline-flex}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* SVG fills must come from CSS (var() doesn't resolve in presentation attributes) */
+.glyph .g0{fill:var(--L0)} .glyph .g2{fill:var(--L2)} .glyph .g4{fill:var(--L4)} .glyph .gd{fill:var(--surface)}
+#arrow path{fill:var(--hair-strong)} #arrow-hot path{fill:var(--accent)}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <button class="btn icon rail-toggle" id="rail-toggle" title="Toggle inventory" aria-label="Toggle inventory panel" aria-expanded="false" aria-controls="rail">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <div class="brand">
+      <svg class="glyph" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect class="g0" x="4" y="4" width="24" height="6.5" rx="2"/>
+        <rect class="g2" x="4" y="12.75" width="24" height="6.5" rx="2"/>
+        <rect class="g4" x="4" y="21.5" width="24" height="6.5" rx="2"/>
+        <circle class="gd" cx="10" cy="7.25" r="1.6"/>
+        <circle class="gd" cx="16" cy="16" r="1.6"/>
+        <circle class="gd" cx="22" cy="24.75" r="1.6"/>
+      </svg>
+      <div>
+        <h1>Stack Mapper</h1>
+        <div class="sub">Software ecosystem &amp; tech-stack visualizer</div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" role="group" aria-label="View">
+      <button id="view-stack" aria-pressed="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>
+        Stack
+      </button>
+      <button id="view-graph" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="6" r="2.5"/><circle cx="18" cy="9" r="2.5"/><circle cx="9" cy="18" r="2.5"/><path d="M7 7.5l9 1M8 15.5l8-5"/></svg>
+        Graph
+      </button>
+      <button id="view-three" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 3v18M4 7.5l8 4.5 8-4.5"/></svg>
+        3D
+      </button>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn primary" id="add-sw">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+      Add software
+    </button>
+    <button class="btn icon" id="btn-export" title="Export JSON" aria-label="Export data as JSON">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg>
+    </button>
+    <button class="btn icon" id="btn-import" title="Import JSON" aria-label="Import data from JSON">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3M8 7l4-4 4 4M5 21h14"/></svg>
+    </button>
+    <input type="file" id="file-in" accept="application/json,.json" hidden>
+    <button class="btn icon" id="btn-theme" title="Toggle theme" aria-label="Toggle light/dark theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+  </header>
+
+  <!-- WORKSPACE -->
+  <div class="work">
+    <!-- LEFT RAIL: inventory -->
+    <aside class="rail" id="rail">
+      <div class="rail-head">
+        <div>
+          <span class="eyebrow">Inventory</span>
+        </div>
+        <span class="count" id="inv-count">0</span>
+      </div>
+      <div class="rail-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="search" id="inv-search" placeholder="Filter software…" autocomplete="off" aria-label="Filter inventory">
+      </div>
+      <div class="rail-scroll" id="inventory"></div>
+      <div class="rail-foot">
+        <button class="btn" id="add-sw-2" style="flex:1;justify-content:center">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+          Add software
+        </button>
+      </div>
+    </aside>
+
+    <!-- CANVAS -->
+    <main class="canvas" id="canvas">
+      <div class="legend" id="legend" aria-label="Layer legend"></div>
+      <div class="canvas-tools" id="graph-tools" hidden>
+        <button class="btn icon" id="g-fit" title="Fit to view" aria-label="Fit graph to view">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+        </button>
+        <button class="btn icon" id="g-relayout" title="Re-run layout" aria-label="Re-run graph layout">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v5h-5"/></svg>
+        </button>
+      </div>
+
+      <!-- Stack view -->
+      <section class="stack" id="stack-view">
+        <div class="stack-inner" id="stack-inner"></div>
+      </section>
+
+      <!-- Graph view -->
+      <section class="graph" id="graph-view" hidden>
+        <svg id="gsvg" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Software relationship graph. Press Tab to move between tools, Enter to edit one.">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0L10 5L0 10z"/>
+            </marker>
+            <marker id="arrow-hot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0L10 5L0 10z"/>
+            </marker>
+          </defs>
+          <g id="g-edges" aria-hidden="true"></g>
+          <g id="g-elabels" aria-hidden="true"></g>
+          <g id="g-nodes"></g>
+        </svg>
+        <div class="hint" id="graph-hint">Drag nodes to arrange · scroll to zoom · click or press Enter on a node to edit</div>
+      </section>
+
+      <!-- 3D view (isometric "cheat") -->
+      <div class="canvas-tools" id="three-tools" hidden>
+        <button class="btn icon" id="t-reset" title="Reset view" aria-label="Reset 3D view">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v5h-5"/></svg>
+        </button>
+      </div>
+      <section class="three" id="three-view" hidden>
+        <svg id="tsvg" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="3D layered view of the software stack. Drag to rotate, scroll to zoom, click or press Enter on a node to edit.">
+          <g id="t-scene"></g>
+        </svg>
+        <div class="hint" id="three-hint">Drag to rotate · scroll to zoom · click or press Enter on a node to edit</div>
+      </section>
+    </main>
+
+    <!-- DETAIL / EDIT PANEL -->
+    <section class="panel" id="panel" aria-hidden="true">
+      <div class="panel-head">
+        <h2 id="panel-title">Add software</h2>
+        <button class="btn ghost icon" id="panel-close" aria-label="Close panel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="panel-body">
+        <div class="field">
+          <label for="f-name">Name</label>
+          <input id="f-name" type="text" placeholder="e.g. AutoCAD" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="f-layer">Layer</label>
+          <select id="f-layer"></select>
+          <div class="hintline">Sets which tier it sits in and its color.</div>
+        </div>
+        <div class="field">
+          <label for="f-vendor">Vendor <span style="text-transform:none;font-weight:400;color:var(--muted)">(optional)</span></label>
+          <input id="f-vendor" type="text" placeholder="e.g. Autodesk" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="f-notes">Notes <span style="text-transform:none;font-weight:400;color:var(--muted)">(optional)</span></label>
+          <textarea id="f-notes" placeholder="What it's used for, owner, license…"></textarea>
+        </div>
+
+        <div class="divider" id="rel-divider"></div>
+        <div id="rel-section">
+          <p class="sec-title">Relationships</p>
+          <div class="rel-list" id="rel-list"></div>
+          <div class="rel-builder" id="rel-builder" style="margin-top:10px">
+            <select id="rb-type"></select>
+            <select id="rb-target"></select>
+            <button class="btn" id="rb-add" style="justify-content:center">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+              Add relationship
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="panel-foot">
+        <button class="btn danger" id="f-delete" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/></svg>
+          Delete
+        </button>
+        <button class="btn primary" id="f-save" style="flex:1">Save</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="backdrop" id="backdrop"></div>
+<div class="toasts" id="toasts"></div>
+
+<div class="confirm-overlay" id="confirm-overlay" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg">
+  <div class="confirm-box">
+    <h3 id="confirm-title">Are you sure?</h3>
+    <p id="confirm-msg"></p>
+    <div class="row">
+      <button class="btn" id="confirm-cancel">Cancel</button>
+      <button class="btn danger-solid" id="confirm-ok">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================= CONFIG ================= */
+const LAYERS = [
+  {id:"presentation", name:"Presentation & BI", desc:"What people see — dashboards, portals, reporting", c:"var(--L0)", wash:"var(--L0-wash)", key:"L0"},
+  {id:"application",  name:"Applications",       desc:"Desktop & productivity tools people run",        c:"var(--L1)", wash:"var(--L1-wash)", key:"L1"},
+  {id:"services",     name:"Services & APIs",    desc:"Integration, middleware, automation",            c:"var(--L2)", wash:"var(--L2-wash)", key:"L2"},
+  {id:"data",         name:"Data & Storage",     desc:"Databases, file/document management",            c:"var(--L3)", wash:"var(--L3-wash)", key:"L3"},
+  {id:"infra",        name:"Infrastructure",     desc:"Compute, identity, network, platform",           c:"var(--L4)", wash:"var(--L4-wash)", key:"L4"},
+  {id:"external",     name:"External / SaaS",    desc:"Third-party & vendor cloud services",            c:"var(--L5)", wash:"var(--L5-wash)", key:"L5"},
+];
+const LMAP = Object.fromEntries(LAYERS.map(l=>[l.id,l]));
+const REL_TYPES = ["depends on","integrates with","sends data to","authenticates via","hosted on","replaces"];
+
+/* ================= STATE ================= */
+const STORE_KEY = "stackmapper.v1";
+let state = {software:[], relationships:[]};
+let selectedId = null;
+let editingId = null;   // null while adding new
+let view = "stack";
+let hiddenLayers = new Set();
+let invFilter = "";
+let invFilterRaw = "";
+
+function uid(){ return "s"+Math.random().toString(36).slice(2,9)+(idctr++); }
+let idctr = 0;
+
+/* ---- persistence (safe) ---- */
+function save(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){ /* preview / private mode */ }
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){ const p = JSON.parse(raw); if(p && Array.isArray(p.software)){ return p; } }
+  }catch(e){}
+  return null;
+}
+
+/* ---- seed sample (engineering-firm flavored) ---- */
+function seed(){
+  const S=(name,layer,vendor,notes)=>({id:uid(),name,layer,vendor:vendor||"",notes:notes||""});
+  const sw=[
+    S("Power BI","presentation","Microsoft","Company dashboards & project reporting"),
+    S("SharePoint","presentation","Microsoft","Intranet & document portal"),
+    S("AutoCAD","application","Autodesk","2D drafting"),
+    S("Civil 3D","application","Autodesk","Civil design & modeling"),
+    S("Bluebeam Revu","application","Bluebeam","PDF markup & takeoffs"),
+    S("Microsoft 365","application","Microsoft","Office productivity suite"),
+    S("Project Portal","services","In-house","Custom client project portal / API"),
+    S("DocuSign","services","DocuSign","e-Signature integration"),
+    S("SQL Server","data","Microsoft","Primary relational database"),
+    S("Autodesk Vault","data","Autodesk","CAD document / drawing management"),
+    S("Azure","infra","Microsoft","Cloud hosting & compute"),
+    S("Entra ID","infra","Microsoft","Identity & single sign-on (Azure AD)"),
+    S("Deltek Vantagepoint","external","Deltek","ERP — accounting & project mgmt"),
+    S("Procore","external","Procore","Construction project management"),
+  ];
+  const by=n=>sw.find(x=>x.name===n).id;
+  const R=(a,t,b)=>({id:uid(),from:by(a),type:t,to:by(b)});
+  const rels=[
+    R("Power BI","sends data to","SQL Server"),   // reads from — modeled as PBI depends
+    R("Power BI","integrates with","Deltek Vantagepoint"),
+    R("AutoCAD","depends on","Autodesk Vault"),
+    R("Civil 3D","depends on","Autodesk Vault"),
+    R("Bluebeam Revu","integrates with","SharePoint"),
+    R("Deltek Vantagepoint","depends on","SQL Server"),
+    R("Autodesk Vault","depends on","SQL Server"),
+    R("Microsoft 365","authenticates via","Entra ID"),
+    R("SharePoint","hosted on","Azure"),
+    R("Project Portal","hosted on","Azure"),
+    R("Project Portal","integrates with","Deltek Vantagepoint"),
+    R("Project Portal","authenticates via","Entra ID"),
+    R("SQL Server","hosted on","Azure"),
+    R("Power BI","authenticates via","Entra ID"),
+    R("DocuSign","integrates with","Project Portal"),
+  ];
+  // fix the Power BI->SQL direction to "reads": represent as depends on
+  rels[0]={id:uid(),from:by("Power BI"),type:"depends on",to:by("SQL Server")};
+  return {software:sw, relationships:rels};
+}
+
+/* ================= HELPERS ================= */
+const $ = s=>document.querySelector(s);
+const el = (tag,cls,txt)=>{const e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e;};
+function swById(id){ return state.software.find(s=>s.id===id); }
+function relsOf(id){ return state.relationships.filter(r=>r.from===id||r.to===id); }
+function neighbors(id){
+  const set=new Set();
+  state.relationships.forEach(r=>{ if(r.from===id)set.add(r.to); if(r.to===id)set.add(r.from); });
+  return set;
+}
+function toast(msg,action){
+  const t=el("div","toast"); t.appendChild(el("span",null,msg));
+  let removed=false;
+  const remove=()=>{
+    if(removed)return; removed=true;
+    t.style.opacity="0"; t.style.transition="opacity .3s"; setTimeout(()=>t.remove(),300);
+  };
+  if(action){
+    const btn=el("button","toast-action",action.label);
+    btn.type="button";
+    btn.addEventListener("click",()=>{ action.onClick(); remove(); });
+    t.appendChild(btn);
+  }
+  $("#toasts").appendChild(t);
+  setTimeout(remove, action?5000:1900);
+}
+
+/* ---- custom confirm dialog (replaces native confirm()) ---- */
+let confirmResolve=null;
+function showConfirm(msg,opts){
+  opts=opts||{};
+  return new Promise(resolve=>{
+    confirmResolve=resolve;
+    $("#confirm-title").textContent=opts.title||"Are you sure?";
+    $("#confirm-msg").textContent=msg;
+    $("#confirm-ok").textContent=opts.okLabel||"Delete";
+    $("#confirm-overlay").classList.add("show");
+    setTimeout(()=>$("#confirm-ok").focus(),50);
+  });
+}
+function closeConfirm(result){
+  if(!confirmResolve)return;
+  $("#confirm-overlay").classList.remove("show");
+  const r=confirmResolve; confirmResolve=null; r(result);
+}
+
+/* ================= RENDER: INVENTORY ================= */
+function renderInventory(){
+  const box=$("#inventory"); box.innerHTML="";
+  const q=invFilter;
+  const pool = q ? state.software.filter(s=>s.name.toLowerCase().includes(q)||(s.vendor&&s.vendor.toLowerCase().includes(q))) : state.software;
+  $("#inv-count").textContent=pool.length;
+  if(state.software.length===0){
+    const e=el("div","empty");
+    e.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg><div>No software yet.<br>Add your first tool to start mapping.</div>';
+    box.appendChild(e); return;
+  }
+  if(pool.length===0){
+    const e=el("div","empty");
+    e.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>';
+    e.appendChild(el("div",null,"No matches for “"+invFilterRaw+"”."));
+    box.appendChild(e); return;
+  }
+  LAYERS.forEach(layer=>{
+    const items=pool.filter(s=>s.layer===layer.id).sort((a,b)=>a.name.localeCompare(b.name));
+    if(items.length===0) return;
+    const g=el("div","layer-group");
+    const h=el("div","lg-head");
+    const dot=el("span","dot"); dot.style.background=layer.c; h.appendChild(dot);
+    h.appendChild(el("span","name",layer.name));
+    h.appendChild(el("span","n",String(items.length)));
+    g.appendChild(h);
+    items.forEach(s=>{
+      const it=el("div","item"+(s.id===selectedId?" sel":""));
+      it.dataset.id=s.id;
+      const bar=el("span","bar"); bar.style.background=layer.c; it.appendChild(bar);
+      const body=el("div","body");
+      body.appendChild(el("div","nm",s.name));
+      if(s.vendor) body.appendChild(el("div","meta",s.vendor));
+      it.appendChild(body);
+      const nrel=relsOf(s.id).length;
+      if(nrel>0){ const lk=el("span","lk","↔ "+nrel); it.appendChild(lk); }
+      it.addEventListener("click",()=>openEdit(s.id));
+      g.appendChild(it);
+    });
+    box.appendChild(g);
+  });
+}
+
+/* ================= RENDER: LEGEND ================= */
+function renderLegend(){
+  const lg=$("#legend"); lg.innerHTML="";
+  lg.appendChild(el("span","eyebrow","Layers"));
+  LAYERS.forEach(layer=>{
+    const cnt=state.software.filter(s=>s.layer===layer.id).length;
+    const row=el("div","row"+(hiddenLayers.has(layer.id)?" off":""));
+    row.title="Click to show/hide";
+    const dot=el("span","dot"); dot.style.background=layer.c; row.appendChild(dot);
+    row.appendChild(el("span",null,layer.name));
+    const n=el("span","mono"); n.style.cssText="margin-left:auto;font-size:10px;color:var(--muted)"; n.textContent=cnt; row.appendChild(n);
+    row.addEventListener("click",()=>{
+      if(hiddenLayers.has(layer.id))hiddenLayers.delete(layer.id); else hiddenLayers.add(layer.id);
+      renderLegend(); renderStack(); renderGraph(); renderThree();
+    });
+    lg.appendChild(row);
+  });
+}
+
+/* ================= RENDER: STACK VIEW ================= */
+let stackHot=null;
+function renderStack(){
+  const box=$("#stack-inner"); box.innerHTML="";
+  LAYERS.forEach(layer=>{
+    if(hiddenLayers.has(layer.id)) return;
+    const items=state.software.filter(s=>s.layer===layer.id).sort((a,b)=>a.name.localeCompare(b.name));
+    const tier=el("div","tier");
+    const head=el("div","tier-head");
+    const dot=el("span","dot"); dot.style.background=layer.c; head.appendChild(dot);
+    head.appendChild(el("span","t-name",layer.name));
+    head.appendChild(el("span","t-desc",layer.desc));
+    head.appendChild(el("span","t-n",items.length+(items.length===1?" tool":" tools")));
+    tier.appendChild(head);
+    const body=el("div","tier-body");
+    if(items.length===0){ body.appendChild(el("div","tier-empty","No software in this layer yet.")); }
+    items.forEach(s=>{
+      const card=el("div","card"); card.dataset.id=s.id; card.style.setProperty("--cardc",layer.c);
+      if(s.id===selectedId) card.classList.add("sel");
+      card.appendChild(el("div","cn",s.name));
+      if(s.vendor) card.appendChild(el("div","cv",s.vendor));
+      card.addEventListener("click",()=>openEdit(s.id));
+      card.addEventListener("mouseenter",()=>highlightStack(s.id));
+      card.addEventListener("mouseleave",()=>highlightStack(null));
+      body.appendChild(card);
+    });
+    tier.appendChild(body);
+    box.appendChild(tier);
+  });
+}
+function highlightStack(id){
+  const cards=document.querySelectorAll("#stack-inner .card");
+  if(!id){ cards.forEach(c=>c.classList.remove("dim","hot")); return; }
+  const nb=neighbors(id); nb.add(id);
+  cards.forEach(c=>{
+    const cid=c.dataset.id;
+    c.classList.toggle("dim",!nb.has(cid));
+    c.classList.toggle("hot", cid!==id && nb.has(cid));
+  });
+}
+
+/* ================= GRAPH VIEW (force layout) ================= */
+const SVGNS="http://www.w3.org/2000/svg";
+function resolveColor(varExpr){
+  const m=/^var\((--[\w-]+)\)$/.exec(varExpr.trim());
+  if(!m) return varExpr;
+  return getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim()||"#888";
+}
+let sim={nodes:[],pos:{},alpha:0,raf:null,running:false};
+let vb={x:0,y:0,w:1000,h:700};   // svg viewBox
+let graphInit=false;
+let dragNode=null, dragMoved=false;
+let panning=false, panStart=null;
+let needFit=false;
+
+function activeNodes(){ return state.software.filter(s=>!hiddenLayers.has(s.layer)); }
+function activeEdges(){
+  const ids=new Set(activeNodes().map(n=>n.id));
+  return state.relationships.filter(r=>ids.has(r.from)&&ids.has(r.to));
+}
+
+function seedPositions(reset){
+  const nodes=activeNodes();
+  const cx=vb.w/2, cy=vb.h/2, R=Math.min(vb.w,vb.h)*0.34;
+  nodes.forEach((n,i)=>{
+    if(reset||!sim.pos[n.id]){
+      const a=(i/Math.max(1,nodes.length))*Math.PI*2;
+      sim.pos[n.id]={x:cx+R*Math.cos(a)+(i%2?12:-12), y:cy+R*Math.sin(a), vx:0, vy:0};
+    }
+  });
+}
+function tick(){
+  seedPositions(false);           // ensure any newly-added / unpositioned nodes have a spot
+  const nodes=activeNodes();
+  const edges=activeEdges();
+  const P=sim.pos;
+  const cx=vb.w/2, cy=vb.h/2;
+  // repulsion
+  for(let i=0;i<nodes.length;i++){
+    const a=P[nodes[i].id];
+    for(let j=i+1;j<nodes.length;j++){
+      const b=P[nodes[j].id];
+      let dx=a.x-b.x, dy=a.y-b.y; let d2=dx*dx+dy*dy; if(d2<1)d2=1;
+      const d=Math.sqrt(d2);
+      const f=9000/d2;
+      const fx=(dx/d)*f, fy=(dy/d)*f;
+      a.vx+=fx; a.vy+=fy; b.vx-=fx; b.vy-=fy;
+    }
+    // centering
+    a.vx+=(cx-a.x)*0.006; a.vy+=(cy-a.y)*0.006;
+  }
+  // springs
+  const L=150;
+  edges.forEach(e=>{
+    const a=P[e.from], b=P[e.to]; if(!a||!b)return;
+    let dx=b.x-a.x, dy=b.y-a.y; let d=Math.sqrt(dx*dx+dy*dy)||1;
+    const f=(d-L)*0.02;
+    const fx=(dx/d)*f, fy=(dy/d)*f;
+    a.vx+=fx; a.vy+=fy; b.vx-=fx; b.vy-=fy;
+  });
+  // integrate
+  nodes.forEach(n=>{
+    const p=P[n.id];
+    if(dragNode===n.id) return;
+    p.vx*=0.82; p.vy*=0.82;
+    const sp=Math.hypot(p.vx,p.vy); if(sp>30){p.vx*=30/sp;p.vy*=30/sp;}
+    p.x+=p.vx*sim.alpha; p.y+=p.vy*sim.alpha;
+  });
+}
+function runSim(reheat){
+  seedPositions(false);
+  if(reheat) sim.alpha=1;
+  if(sim.running) return;
+  sim.running=true;
+  const step=()=>{
+    for(let k=0;k<2;k++) tick();
+    sim.alpha*=0.985;
+    drawGraph(false);
+    if(view==="graph" && (sim.alpha>0.02 || dragNode)){ sim.raf=requestAnimationFrame(step); }
+    else { sim.running=false; if(view==="graph" && needFit){ needFit=false; fitGraph(); } }
+  };
+  sim.raf=requestAnimationFrame(step);
+}
+
+function drawGraph(full){
+  if(view!=="graph") return;
+  const gE=$("#g-edges"), gL=$("#g-elabels"), gN=$("#g-nodes");
+  const nodes=activeNodes(), edges=activeEdges(), P=sim.pos;
+  const hot = selectedId && swById(selectedId) && !hiddenLayers.has(swById(selectedId).layer) ? selectedId : null;
+  const nb = hot ? neighbors(hot) : null;
+
+  // edges
+  gE.innerHTML=""; gL.innerHTML="";
+  edges.forEach(e=>{
+    const a=P[e.from], b=P[e.to]; if(!a||!b)return;
+    const involved = hot && (e.from===hot||e.to===hot);
+    const line=document.createElementNS(SVGNS,"line");
+    // shorten to node edge (r=18)
+    const dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1, ux=dx/d, uy=dy/d;
+    line.setAttribute("x1",a.x+ux*19); line.setAttribute("y1",a.y+uy*19);
+    line.setAttribute("x2",b.x-ux*22); line.setAttribute("y2",b.y-uy*22);
+    line.setAttribute("class","edge"+(involved?" hot":"")+(hot&&!involved?" faded":""));
+    line.setAttribute("marker-end",involved?"url(#arrow-hot)":"url(#arrow)");
+    gE.appendChild(line);
+    if(involved || !hot){
+      const t=document.createElementNS(SVGNS,"text");
+      t.setAttribute("x",(a.x+b.x)/2); t.setAttribute("y",(a.y+b.y)/2-3);
+      t.setAttribute("text-anchor","middle"); t.setAttribute("class","edge-label");
+      if(hot&&!involved) t.setAttribute("opacity","0");
+      t.textContent=e.type;
+      gL.appendChild(t);
+    }
+  });
+
+  // nodes
+  gN.innerHTML="";
+  nodes.forEach(n=>{
+    const p=P[n.id]; if(!p)return;
+    const layer=LMAP[n.layer];
+    const faded = hot && n.id!==hot && !nb.has(n.id);
+    const g=document.createElementNS(SVGNS,"g");
+    g.setAttribute("class","node node-hit"+(faded?" faded":""));
+    g.setAttribute("transform",`translate(${p.x},${p.y})`);
+    g.dataset.id=n.id;
+    g.setAttribute("tabindex","0");
+    g.setAttribute("role","button");
+    const relCount=relsOf(n.id).length;
+    g.setAttribute("aria-label",n.name+", "+layer.name+" layer"+(relCount?", "+relCount+" relationship"+(relCount===1?"":"s"):", no relationships"));
+    const c=document.createElementNS(SVGNS,"circle");
+    c.setAttribute("r","18");
+    c.setAttribute("fill",resolveColor(layer.c));
+    c.setAttribute("class","node-circle"+(n.id===selectedId?" sel":""));
+    g.appendChild(c);
+    const label=document.createElementNS(SVGNS,"text");
+    label.setAttribute("y","33"); label.setAttribute("text-anchor","middle"); label.setAttribute("class","node-label");
+    label.textContent=n.name;
+    g.appendChild(label);
+    gN.appendChild(g);
+  });
+}
+
+function renderGraph(){
+  if(view!=="graph"){ return; }
+  const svg=$("#gsvg");
+  if(!graphInit){
+    const r=svg.getBoundingClientRect();
+    vb={x:0,y:0,w:r.width||1000,h:r.height||700};
+    svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+    graphInit=true;
+  }
+  seedPositions(false);
+  runSim(true);
+}
+
+/* ---- graph interaction ---- */
+function svgPoint(evt){
+  const svg=$("#gsvg"); const r=svg.getBoundingClientRect();
+  const x=vb.x+(evt.clientX-r.left)/r.width*vb.w;
+  const y=vb.y+(evt.clientY-r.top)/r.height*vb.h;
+  return {x,y};
+}
+function setupGraphEvents(){
+  const svg=$("#gsvg");
+  svg.addEventListener("pointerdown",e=>{
+    const g=e.target.closest(".node-hit");
+    if(g){
+      dragNode=g.dataset.id; dragMoved=false;
+      try{svg.setPointerCapture(e.pointerId);}catch(err){}
+    } else {
+      panning=true; panStart={x:e.clientX,y:e.clientY,vx:vb.x,vy:vb.y};
+      svg.classList.add("panning");
+    }
+  });
+  svg.addEventListener("pointermove",e=>{
+    if(dragNode){
+      const p=svgPoint(e); const pos=sim.pos[dragNode];
+      if(pos){ pos.x=p.x; pos.y=p.y; pos.vx=0; pos.vy=0; dragMoved=true; runSim(true); }
+    } else if(panning){
+      const r=svg.getBoundingClientRect();
+      const dx=(e.clientX-panStart.x)/r.width*vb.w;
+      const dy=(e.clientY-panStart.y)/r.height*vb.h;
+      vb.x=panStart.vx-dx; vb.y=panStart.vy-dy;
+      svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+    }
+  });
+  svg.addEventListener("pointerup",e=>{
+    if(dragNode){
+      if(!dragMoved){ openEdit(dragNode); }
+      dragNode=null;
+    }
+    panning=false; svg.classList.remove("panning");
+  });
+  svg.addEventListener("pointercancel",()=>{dragNode=null;panning=false;svg.classList.remove("panning");});
+  svg.addEventListener("keydown",e=>{
+    const g=e.target.closest && e.target.closest(".node-hit");
+    if(!g)return;
+    if(e.key==="Enter"||e.key===" "||e.key==="Spacebar"){ e.preventDefault(); openEdit(g.dataset.id); }
+  });
+  svg.addEventListener("wheel",e=>{
+    e.preventDefault();
+    const p=svgPoint(e);
+    const factor=e.deltaY<0?0.86:1.16;
+    const nw=Math.min(4000,Math.max(300,vb.w*factor));
+    const nh=nw*(vb.h/vb.w);
+    vb.x=p.x-(p.x-vb.x)*(nw/vb.w);
+    vb.y=p.y-(p.y-vb.y)*(nh/vb.h);
+    vb.w=nw; vb.h=nh;
+    svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  },{passive:false});
+}
+function fitGraph(){
+  const nodes=activeNodes(); if(nodes.length===0)return;
+  let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
+  nodes.forEach(n=>{const p=sim.pos[n.id];if(!p)return;minx=Math.min(minx,p.x);miny=Math.min(miny,p.y);maxx=Math.max(maxx,p.x);maxy=Math.max(maxy,p.y);});
+  if(minx>maxx)return;
+  const pad=115;
+  const svg=$("#gsvg"); const r=svg.getBoundingClientRect(); const aspect=(r.width||1000)/(r.height||700);
+  let w=(maxx-minx)+pad*2, h=(maxy-miny)+pad*2;
+  if(w/h>aspect){ h=w/aspect; } else { w=h*aspect; }
+  vb={x:(minx+maxx)/2-w/2, y:(miny+maxy)/2-h/2, w, h};
+  svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  drawGraph(false);
+}
+
+/* ================= 3D VIEW (orthographic "cheat" — no WebGL, just trig) =================
+   Each layer is a horizontal floor stacked by height (Presentation on top, External at the
+   base, like a building). Nodes sit in a simple grid on their own floor — recomputed fresh
+   every render, so there's no position cache to go stale. The "camera" is an orthographic
+   projection with a rotatable azimuth and a clamped elevation; painter's-algorithm depth
+   sorting gives correct-enough occlusion, and near/far nodes are scaled + faded for a cheap
+   parallax cue. */
+const LAYER_SPACING = 145;  // vertical gap between stacked floors, world units
+const FLOOR_SIZE = 250;     // footprint width/depth of one layer's floor, world units
+const THREE_DEFAULT = {az:-0.75, el:0.55, zoom:1};
+let camAz=THREE_DEFAULT.az, camEl=THREE_DEFAULT.el, camZoom=THREE_DEFAULT.zoom;
+
+function project3(wx,wy,wz){
+  const cosA=Math.cos(camAz), sinA=Math.sin(camAz);
+  const x1=wx*cosA-wz*sinA, z1=wx*sinA+wz*cosA;
+  const cosE=Math.cos(camEl), sinE=Math.sin(camEl);
+  const y2=wy*cosE-z1*sinE;
+  const depth=wy*sinE+z1*cosE;
+  return {x:x1, y:-y2, depth};
+}
+function buildScene3(){
+  const hot = selectedId && swById(selectedId) && !hiddenLayers.has(swById(selectedId).layer) ? selectedId : null;
+  const nb = hot?neighbors(hot):null;
+  const posLookup={};
+  const items=[];
+  LAYERS.forEach((layer,idx)=>{
+    if(hiddenLayers.has(layer.id))return;
+    const wy=(LAYERS.length-1-idx)*LAYER_SPACING;
+    const hs=FLOOR_SIZE/2;
+    const corners=[[-hs,-hs],[hs,-hs],[hs,hs],[-hs,hs]].map(([lx,lz])=>project3(lx,wy,lz));
+    const cdepth=(corners[0].depth+corners[1].depth+corners[2].depth+corners[3].depth)/4;
+    items.push({kind:"floor",depth:cdepth,layer,corners});
+
+    const members=state.software.filter(s=>s.layer===layer.id).sort((a,b)=>a.name.localeCompare(b.name));
+    const n=members.length;
+    const cols=Math.max(1,Math.ceil(Math.sqrt(n)));
+    const rows=Math.max(1,Math.ceil(n/cols));
+    const cellW=FLOOR_SIZE/(cols+1), cellD=FLOOR_SIZE/(rows+1);
+    members.forEach((s,i)=>{
+      const r=Math.floor(i/cols), c=i%cols;
+      const lx=(c+1)*cellW-hs, lz=(r+1)*cellD-hs;
+      const proj=project3(lx,wy,lz);
+      posLookup[s.id]=proj;
+      items.push({kind:"node",depth:proj.depth,sw:s,layer,proj,faded:!!(hot&&s.id!==hot&&!(nb&&nb.has(s.id)))});
+    });
+  });
+  state.relationships.forEach(rel=>{
+    const a=posLookup[rel.from], b=posLookup[rel.to]; if(!a||!b)return;
+    const involved=!!(hot&&(rel.from===hot||rel.to===hot));
+    items.push({kind:"edge",depth:(a.depth+b.depth)/2,a,b,involved,faded:!!(hot&&!involved)});
+  });
+  return items;
+}
+function renderThree(){
+  if(view!=="three")return;
+  const svg=$("#tsvg");
+  const r=svg.getBoundingClientRect();
+  const w=r.width||1000, h=r.height||700;
+  svg.setAttribute("viewBox",`${-w/2} ${-h/2} ${w} ${h}`);
+
+  const scene=buildScene3();
+  const g=$("#t-scene"); g.innerHTML="";
+  if(scene.length===0)return;
+
+  let minx=Infinity,maxx=-Infinity,miny=Infinity,maxy=-Infinity;
+  scene.forEach(it=>{
+    const pts = it.kind==="floor" ? it.corners : it.kind==="edge" ? [it.a,it.b] : [it.proj];
+    pts.forEach(p=>{ minx=Math.min(minx,p.x); maxx=Math.max(maxx,p.x); miny=Math.min(miny,p.y); maxy=Math.max(maxy,p.y); });
+  });
+  const cx=(minx+maxx)/2, cy=(miny+maxy)/2;   // recenter on the content's own midpoint, not the world origin
+  const spanX=Math.max(1,maxx-minx), spanY=Math.max(1,maxy-miny);
+  const pad=56;   // screen-px headroom so node labels + floor labels don't clip at the edges
+  const scale=Math.min((w-2*pad)/spanX,(h-2*pad)/spanY)*camZoom;
+  const toX = x => ((x-cx)*scale).toFixed(1);
+  const toY = y => ((y-cy)*scale).toFixed(1);
+
+  const depths=scene.map(it=>it.depth);
+  const dmin=Math.min(...depths), dmax=Math.max(...depths);
+  const far = d => dmax===dmin?0.5:(d-dmin)/(dmax-dmin);   // 0 = nearest, 1 = farthest
+
+  scene.sort((a,b)=>b.depth-a.depth);   // farthest first, so nearer things paint on top
+  scene.forEach(it=>{
+    if(it.kind==="floor"){
+      const poly=document.createElementNS(SVGNS,"polygon");
+      poly.setAttribute("points",it.corners.map(c=>`${toX(c.x)},${toY(c.y)}`).join(" "));
+      poly.setAttribute("class","t-floor");
+      poly.setAttribute("fill",resolveColor(it.layer.wash));
+      poly.setAttribute("fill-opacity","0.55");
+      poly.setAttribute("stroke",resolveColor(it.layer.c));
+      g.appendChild(poly);
+      const left=it.corners.reduce((m,c)=>c.x<m.x?c:m,it.corners[0]);
+      const label=document.createElementNS(SVGNS,"text");
+      label.setAttribute("x",(Number(toX(left.x))-10).toFixed(1)); label.setAttribute("y",(Number(toY(left.y))+4).toFixed(1));
+      label.setAttribute("text-anchor","end");
+      label.setAttribute("class","t-floor-label");
+      label.textContent=it.layer.name;
+      g.appendChild(label);
+    } else if(it.kind==="edge"){
+      const line=document.createElementNS(SVGNS,"line");
+      line.setAttribute("x1",toX(it.a.x)); line.setAttribute("y1",toY(it.a.y));
+      line.setAttribute("x2",toX(it.b.x)); line.setAttribute("y2",toY(it.b.y));
+      line.setAttribute("class","edge"+(it.involved?" hot":"")+(it.faded?" faded":""));
+      g.appendChild(line);
+    } else {
+      const t=far(it.depth);
+      const rad=16*(1-0.4*t);
+      const grp=document.createElementNS(SVGNS,"g");
+      grp.setAttribute("class","node node-hit"+(it.faded?" faded":""));
+      grp.setAttribute("transform",`translate(${toX(it.proj.x)},${toY(it.proj.y)})`);
+      grp.dataset.id=it.sw.id;
+      grp.setAttribute("tabindex","0");
+      grp.setAttribute("role","button");
+      const relCount=relsOf(it.sw.id).length;
+      grp.setAttribute("aria-label",it.sw.name+", "+it.layer.name+" layer"+(relCount?", "+relCount+" relationship"+(relCount===1?"":"s"):", no relationships"));
+      grp.style.opacity=String((1-0.45*t).toFixed(2));
+      const circle=document.createElementNS(SVGNS,"circle");
+      circle.setAttribute("r",rad.toFixed(1));
+      circle.setAttribute("fill",resolveColor(it.layer.c));
+      circle.setAttribute("class","node-circle"+(it.sw.id===selectedId?" sel":""));
+      grp.appendChild(circle);
+      const label=document.createElementNS(SVGNS,"text");
+      label.setAttribute("y",(rad+14).toFixed(1)); label.setAttribute("text-anchor","middle");
+      label.setAttribute("class","node-label");
+      label.style.fontSize=Math.max(9,11.5*(1-0.3*t)).toFixed(1)+"px";
+      label.textContent=it.sw.name;
+      grp.appendChild(label);
+      g.appendChild(grp);
+    }
+  });
+}
+function resetThreeView(){ camAz=THREE_DEFAULT.az; camEl=THREE_DEFAULT.el; camZoom=THREE_DEFAULT.zoom; renderThree(); }
+function setupThreeEvents(){
+  const svg=$("#tsvg");
+  let dragging=false, moved=false, startX=0, startY=0, startAz=0, startEl=0, downNode=null;
+  svg.addEventListener("pointerdown",e=>{
+    dragging=true; moved=false; startX=e.clientX; startY=e.clientY; startAz=camAz; startEl=camEl;
+    downNode = e.target.closest && e.target.closest(".node-hit");
+    try{svg.setPointerCapture(e.pointerId);}catch(err){}
+    svg.classList.add("rotating");
+  });
+  svg.addEventListener("pointermove",e=>{
+    if(!dragging)return;
+    const dx=e.clientX-startX, dy=e.clientY-startY;
+    if(Math.hypot(dx,dy)>4) moved=true;
+    camAz = startAz + dx*0.008;
+    camEl = Math.min(1.3, Math.max(0.15, startEl - dy*0.008));
+    renderThree();
+  });
+  const end=()=>{
+    dragging=false; svg.classList.remove("rotating");
+    if(!moved && downNode){ openEdit(downNode.dataset.id); }
+    downNode=null;
+  };
+  svg.addEventListener("pointerup",end);
+  svg.addEventListener("pointercancel",end);
+  svg.addEventListener("wheel",e=>{
+    e.preventDefault();
+    camZoom=Math.min(2.5,Math.max(0.5,camZoom*(e.deltaY<0?1.08:0.93)));
+    renderThree();
+  },{passive:false});
+  svg.addEventListener("keydown",e=>{
+    const g=e.target.closest && e.target.closest(".node-hit");
+    if(!g)return;
+    if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openEdit(g.dataset.id); }
+  });
+}
+
+/* ================= EDIT PANEL ================= */
+function fillLayerSelect(){
+  const sel=$("#f-layer"); sel.innerHTML="";
+  LAYERS.forEach(l=>{ const o=el("option",null,l.name); o.value=l.id; sel.appendChild(o); });
+  const rt=$("#rb-type"); rt.innerHTML="";
+  REL_TYPES.forEach(t=>{ const o=el("option",null,t); o.value=t; rt.appendChild(o); });
+}
+function openAdd(){
+  editingId=null; selectedId=null;
+  $("#panel-title").textContent="Add software";
+  $("#f-name").value=""; $("#f-vendor").value=""; $("#f-notes").value="";
+  $("#f-layer").value=LAYERS[0].id;
+  $("#f-delete").hidden=true;
+  $("#rel-section").style.display="none";  // relationships added after first save
+  $("#rel-divider").style.display="none";
+  openPanel();
+  setTimeout(()=>$("#f-name").focus(),60);
+}
+function openEdit(id){
+  const s=swById(id); if(!s)return;
+  editingId=id; selectedId=id;
+  $("#panel-title").textContent="Edit software";
+  $("#f-name").value=s.name; $("#f-vendor").value=s.vendor||""; $("#f-notes").value=s.notes||"";
+  $("#f-layer").value=s.layer;
+  $("#f-delete").hidden=false;
+  $("#rel-section").style.display="";
+  $("#rel-divider").style.display="";
+  renderRelEditor(id);
+  openPanel();
+  renderInventory(); renderStack();
+  if(view==="graph")drawGraph(false); else if(view==="three")renderThree();
+}
+function renderRelEditor(id){
+  const list=$("#rel-list"); list.innerHTML="";
+  const rs=relsOf(id);
+  if(rs.length===0){ const e=el("div"); e.style.cssText="font-size:12px;color:var(--muted);padding:2px 0 4px"; e.textContent="No relationships yet."; list.appendChild(e); }
+  rs.forEach(r=>{
+    const other = r.from===id ? swById(r.to) : swById(r.from);
+    if(!other) return;
+    const outgoing = r.from===id;
+    const row=el("div","rel");
+    row.appendChild(el("span","rt",r.type));
+    const dir=el("span","dir"); dir.innerHTML = outgoing?"&rarr;":"&larr;"; row.appendChild(dir);
+    row.appendChild(el("span","rn",other.name));
+    const x=el("span","x"); x.title="Remove"; x.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    x.addEventListener("click",ev=>{
+      ev.stopPropagation();
+      state.relationships=state.relationships.filter(x2=>x2.id!==r.id);
+      save(); renderRelEditor(id); renderInventory(); refreshView();
+      toast("Relationship removed.",{label:"Undo",onClick:()=>{
+        state.relationships.push(r);
+        save(); renderRelEditor(id); renderInventory(); refreshView();
+      }});
+    });
+    row.appendChild(x);
+    list.appendChild(row);
+  });
+  // targets
+  const tsel=$("#rb-target"); tsel.innerHTML="";
+  const ph=el("option",null,"Select target software…"); ph.value=""; tsel.appendChild(ph);
+  state.software.filter(s=>s.id!==id).sort((a,b)=>a.name.localeCompare(b.name)).forEach(s=>{
+    const o=el("option",null,s.name+(s.vendor?" · "+s.vendor:"")); o.value=s.id; tsel.appendChild(o);
+  });
+}
+function syncBackdrop(){
+  const show=(window.innerWidth<=760)&&($("#panel").classList.contains("open")||$("#rail").classList.contains("open"));
+  $("#backdrop").classList.toggle("show",show);
+}
+function openPanel(){
+  if(window.innerWidth<=760) closeRail();
+  $("#panel").classList.add("open"); $("#panel").setAttribute("aria-hidden","false"); syncBackdrop();
+}
+function closePanel(){
+  $("#panel").classList.remove("open"); $("#panel").setAttribute("aria-hidden","true"); syncBackdrop();
+  selectedId=null; renderInventory(); renderStack();
+  if(view==="graph")drawGraph(false); else if(view==="three")renderThree();
+}
+function openRail(){ $("#rail").classList.add("open"); $("#rail-toggle").setAttribute("aria-expanded","true"); syncBackdrop(); }
+function closeRail(){ $("#rail").classList.remove("open"); $("#rail-toggle").setAttribute("aria-expanded","false"); syncBackdrop(); }
+function toggleRail(){ $("#rail").classList.contains("open") ? closeRail() : openRail(); }
+
+function saveForm(){
+  const name=$("#f-name").value.trim();
+  if(!name){ toast("Give the software a name."); $("#f-name").focus(); return; }
+  const layer=$("#f-layer").value, vendor=$("#f-vendor").value.trim(), notes=$("#f-notes").value.trim();
+  if(editingId){
+    const s=swById(editingId); s.name=name; s.layer=layer; s.vendor=vendor; s.notes=notes;
+    toast("Saved “"+name+"”.");
+  } else {
+    const s={id:uid(),name,layer,vendor,notes};
+    state.software.push(s); editingId=s.id; selectedId=s.id;
+    // flip panel into edit mode so relationships can be added
+    $("#panel-title").textContent="Edit software";
+    $("#f-delete").hidden=false;
+    $("#rel-section").style.display=""; $("#rel-divider").style.display="";
+    renderRelEditor(s.id);
+    toast("Added “"+name+"”. Now add its relationships.");
+  }
+  save(); renderInventory(); renderLegend(); refreshView();
+}
+async function deleteSw(){
+  if(!editingId)return;
+  const s=swById(editingId); if(!s)return;
+  const relCount=relsOf(editingId).length;
+  const msg="Delete “"+s.name+"”"+(relCount?" and its "+relCount+" relationship"+(relCount===1?"":"s"):"")+"? You can undo this from the toast right after.";
+  const ok=await showConfirm(msg,{title:"Delete software"});
+  if(!ok)return;
+  const removedRels=state.relationships.filter(r=>r.from===editingId||r.to===editingId);
+  state.software=state.software.filter(x=>x.id!==editingId);
+  state.relationships=state.relationships.filter(r=>r.from!==editingId&&r.to!==editingId);
+  delete sim.pos[editingId];
+  save(); closePanel(); renderInventory(); renderLegend(); refreshView();
+  toast("Deleted “"+s.name+"”.",{label:"Undo",onClick:()=>{
+    state.software.push(s);
+    state.relationships.push(...removedRels);
+    save(); renderAll(); refreshView();
+    toast("Restored “"+s.name+"”.");
+  }});
+}
+function addRel(){
+  const type=$("#rb-type").value; const to=$("#rb-target").value;
+  if(!to){ toast("Pick a target."); return; }
+  if(to===editingId){ toast("Can't relate to itself."); return; }
+  const exists=state.relationships.some(r=>r.from===editingId&&r.to===to&&r.type===type);
+  if(exists){ toast("That relationship already exists."); return; }
+  state.relationships.push({id:uid(),from:editingId,type,to});
+  save(); renderRelEditor(editingId); renderInventory(); renderLegend(); refreshView();
+}
+
+/* ================= VIEW SWITCH ================= */
+function refreshView(){
+  if(view==="stack"){ renderStack(); }
+  else if(view==="graph"){ runSim(true); }
+  else if(view==="three"){ renderThree(); }
+}
+function setView(v){
+  view=v;
+  $("#view-stack").setAttribute("aria-pressed",String(v==="stack"));
+  $("#view-graph").setAttribute("aria-pressed",String(v==="graph"));
+  $("#view-three").setAttribute("aria-pressed",String(v==="three"));
+  $("#stack-view").hidden = v!=="stack";
+  $("#graph-view").hidden = v!=="graph";
+  $("#three-view").hidden = v!=="three";
+  $("#graph-tools").hidden = v!=="graph";
+  $("#three-tools").hidden = v!=="three";
+  $("#legend").style.display = (v==="graph"||v==="three") ? "" : "none";  // tiers are their own legend in stack view
+  if(v==="graph"){ graphInit=false; needFit=true; renderGraph(); }
+  else if(v==="three"){ renderThree(); }
+  else { renderStack(); }
+}
+
+/* ================= IMPORT / EXPORT ================= */
+function exportJSON(){
+  const data=JSON.stringify({version:1,exported:new Date().toISOString(),...state},null,2);
+  const blob=new Blob([data],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="stack-map.json"; document.body.appendChild(a); a.click();
+  a.remove(); URL.revokeObjectURL(url);
+  toast("Exported stack-map.json");
+}
+function importJSON(file){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const p=JSON.parse(reader.result);
+      if(!p||!Array.isArray(p.software)) throw new Error("bad");
+      // sanitize
+      const validLayers=new Set(LAYERS.map(l=>l.id));
+      const sw=p.software.filter(s=>s&&s.id&&s.name).map(s=>({id:String(s.id),name:String(s.name),layer:validLayers.has(s.layer)?s.layer:"application",vendor:s.vendor?String(s.vendor):"",notes:s.notes?String(s.notes):""}));
+      const ids=new Set(sw.map(s=>s.id));
+      const rels=(Array.isArray(p.relationships)?p.relationships:[]).filter(r=>r&&ids.has(r.from)&&ids.has(r.to)).map(r=>({id:r.id||uid(),from:r.from,type:REL_TYPES.includes(r.type)?r.type:"integrates with",to:r.to}));
+      state={software:sw,relationships:rels};
+      sim.pos={}; selectedId=null; hiddenLayers.clear();
+      save(); renderAll(); refreshView();
+      toast("Imported "+sw.length+" tools.");
+    }catch(e){ toast("Couldn't read that file — expected an exported stack map."); }
+  };
+  reader.readAsText(file);
+}
+
+/* ================= THEME ================= */
+function currentThemeExplicit(){ return document.documentElement.getAttribute("data-theme"); }
+function toggleTheme(){
+  const cur=currentThemeExplicit();
+  let next;
+  if(cur==="dark")next="light"; else if(cur==="light")next="dark";
+  else { next = matchMedia("(prefers-color-scheme: dark)").matches ? "light":"dark"; }
+  document.documentElement.setAttribute("data-theme",next);
+  try{localStorage.setItem("stackmapper.theme",next);}catch(e){}
+  if(view==="graph")drawGraph(false); else if(view==="three")renderThree();
+}
+(function initTheme(){ try{const t=localStorage.getItem("stackmapper.theme"); if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){} })();
+
+/* ================= RENDER ALL ================= */
+function renderAll(){ renderInventory(); renderLegend(); renderStack(); }
+
+/* ================= INIT ================= */
+function init(){
+  fillLayerSelect();
+  const loaded=load();
+  state = loaded || seed();
+  if(!loaded) save();
+  renderAll();
+  setupGraphEvents();
+  setupThreeEvents();
+
+  $("#view-stack").addEventListener("click",()=>setView("stack"));
+  $("#view-graph").addEventListener("click",()=>setView("graph"));
+  $("#view-three").addEventListener("click",()=>setView("three"));
+  $("#t-reset").addEventListener("click",resetThreeView);
+  $("#add-sw").addEventListener("click",openAdd);
+  $("#add-sw-2").addEventListener("click",openAdd);
+  $("#panel-close").addEventListener("click",closePanel);
+  $("#backdrop").addEventListener("click",()=>{ closePanel(); closeRail(); });
+  $("#f-save").addEventListener("click",saveForm);
+  $("#f-delete").addEventListener("click",deleteSw);
+  $("#rb-add").addEventListener("click",addRel);
+  $("#btn-export").addEventListener("click",exportJSON);
+  $("#btn-import").addEventListener("click",()=>$("#file-in").click());
+  $("#file-in").addEventListener("change",e=>{ if(e.target.files[0])importJSON(e.target.files[0]); e.target.value=""; });
+  $("#btn-theme").addEventListener("click",toggleTheme);
+  $("#g-fit").addEventListener("click",fitGraph);
+  $("#g-relayout").addEventListener("click",()=>{ sim.pos={}; seedPositions(true); needFit=true; runSim(true); });
+  $("#f-name").addEventListener("keydown",e=>{ if(e.key==="Enter")saveForm(); });
+  $("#rail-toggle").addEventListener("click",toggleRail);
+  $("#inv-search").addEventListener("input",e=>{ invFilterRaw=e.target.value.trim(); invFilter=invFilterRaw.toLowerCase(); renderInventory(); });
+  $("#confirm-cancel").addEventListener("click",()=>closeConfirm(false));
+  $("#confirm-ok").addEventListener("click",()=>closeConfirm(true));
+  $("#confirm-overlay").addEventListener("click",e=>{ if(e.target===e.currentTarget)closeConfirm(false); });
+  document.addEventListener("keydown",e=>{
+    if(e.key!=="Escape")return;
+    if($("#confirm-overlay").classList.contains("show")){ closeConfirm(false); return; }
+    closePanel(); closeRail();
+  });
+
+  window.addEventListener("resize",()=>{ if(view==="graph"){ drawGraph(false); } else if(view==="three"){ renderThree(); } syncBackdrop(); });
+
+  setView("stack");
+}
+document.addEventListener("DOMContentLoaded",init);
+</script>
+</body>
+</html>
